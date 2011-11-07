@@ -6,6 +6,8 @@
    [clojure.string :as st]
    [clj-time [core :as tm] [format :as tmf]]])
 
+(defrecord WorkItem [date qty task typ unitPrice works])
+
 (def *base-url* "file:///C:/Users/Dax/git/clparse/clparse/invoice.html")
 
 (def document
@@ -46,7 +48,7 @@
   (def works (get-works colonSplit)) 
   (def qty (bigdec (html/text (nth td 2))))
   (def unitPrice (bigdec (st/replace (html/text (nth td 3)) #"[^0-9\.]" "")))
-  unitPrice)
+  (WorkItem. date qty task tp unitPrice works))
 
 (def items
   (vec (map toItem trs)))
