@@ -61,14 +61,9 @@
 (def items
   (vec (map toItem trs)))
 
-  
-;(defn applyToSum [docu taskGroup]
-;  (def desc (key taskGroup))
-;  (def amt (reduce + (range 10)));(map taskGroup (fn [grp] (* (:qty grp) (:unitPrice grp))))))
-;  (def sumt (html/transform summaryTable [:client-document-item-rows-odd]
-;                            (clone-for)))
-;  (html/transform docu [:#summary_body] (html/append (summaryRow desc amt))))
 
+(defn get-total [workitem]
+  (* (:unitPrice workitem) (:qty workitem)))
 
 (def fullSummary
   (html/transform summaryTable [:tr.client-document-item-rows-odd]
@@ -76,7 +71,7 @@
                                 [:p]
                                 (html/content (key tg))
                                 [:td.client-document-item-amount]
-                                (html/content (str (reduce + (map (fn [grp] (* (:qty grp) (:unitPrice grp))) (val tg))))))))
+                                (html/content (str (reduce + (map get-total (val tg))))))))
   
 
 (def docWithTransform
