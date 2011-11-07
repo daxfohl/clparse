@@ -8,10 +8,14 @@
 
 (defrecord WorkItem [date qty task typ unitPrice works])
 
-(def *base-url* "file:///C:/Users/Dax/git/clparse/clparse/invoice.html")
-
 (def document
-  (html/html-resource (java.net.URL. *base-url*)))
+  (html/html-resource (java.net.URL. "file:///C:/Users/Dax/git/clparse/clparse/invoice.html")))
+
+(def summaryTable
+  (first (html/select           
+           (html/html-resource (java.net.URL. "file:///C:/Users/Dax/git/clparse/clparse/summary_table.html"))
+           [:#summary_table])))
+
 
 (def client-document
   (-> document
@@ -57,52 +61,29 @@
 (def items
   (vec (map toItem trs)))
 
-(def summaryTable
-  '({:tag :table,
-     :attrs {:summary "Invoice Summary",
-             :class "client-document-items",
-             :cellspacing "0"}
-     :content ({:tag :thead,
-                :content ({:tag :tr,
-                           :content ({:tag :th,
-                                      :attrs {:class "client-document-item-description"}
-                                      :content ("Item")}
-                                     {:tag :th,
-                                      :attrs {:class "client-document-item-amount last"}
-                                      :content ("Amount")}
-                                      )})}
-                {:tag :tbody,
-                 :attrs {:class "client-document-item-rows",
-                         :id "summary_body"}})}))
-
-(defn summaryRow [desc amt]
-  '({:tag :tr,
-     :attrs {:class "client-document-item-rows-odd"}
-             :content ({:tag :td,
-                        :attrs {:class "client-document-item-description"}
-                        :content (desc)}
-                       {:tag :tr,
-                        :attrs {:class "client-document-item-amount last"}
-                        :content (amt)}
-                        )}))
   
-(defn applyToSum [docu taskGroup]
-  (def desc (key taskGroup))
-  (def amt (reduce + (range 10)));(map taskGroup (fn [grp] (* (:qty grp) (:unitPrice grp))))))
-  (html/transform docu [:#summary_body] (html/append (summaryRow desc amt))))
-  ;docu)
+;(defn applyToSum [docu taskGroup]
+;  (def desc (key taskGroup))
+;  (def amt (reduce + (range 10)));(map taskGroup (fn [grp] (* (:qty grp) (:unitPrice grp))))))
+;  (def sumt (html/transform summaryTable [:client-document-item-rows-odd]
+;                            (clone-for)))
+;  (html/transform docu [:#summary_body] (html/append (summaryRow desc amt))))
 
 
-(defn appendToSummary [docu]
-  (def taskGroups (group-by :task items))
-  (reduce applyToSum docu taskGroups))
+(def fullSummary
+  (html/transform summaryTable [:tr.client-document-item-rows-odd]
+                            (html/clone-for [tg (group-by :typ items)]
+                                [:p]
+                                (html/content "0")
+                                [:td.client-document-item-amount]
+                                (html/content "2345"))))
   
 
 (def docWithTransform
-  (appendToSummary (html/transform document [:#client_document] (html/prepend summaryTable))))
+  (html/transform document [:#client_document] (html/prepend summaryTable)))
 
 
-(defn -main []
-  ;(pp/pprint (nth(html/select docWithTransform [:table]) 2)))  
-  (println (apply str (html/emit* docWithTransform))))
+(defn -main []  
+  ;(pp/pprint (html/select docWithTransform [:#summary_table])))
+  ;(println (apply str (html/emit* docWithTransform))))
 
