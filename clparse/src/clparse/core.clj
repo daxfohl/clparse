@@ -12,9 +12,9 @@
   (html/html-resource (java.net.URL. "file:///C:/Users/Dax/git/clparse/clparse/invoice.html")))
 
 (def summaryTable
-  (first (html/select           
+  (html/select           
            (html/html-resource (java.net.URL. "file:///C:/Users/Dax/git/clparse/clparse/summary_table.html"))
-           [:#summary_table])))
+           [:#summary_table]))
 
 
 (def client-document
@@ -74,16 +74,16 @@
   (html/transform summaryTable [:tr.client-document-item-rows-odd]
                             (html/clone-for [tg (group-by :typ items)]
                                 [:p]
-                                (html/content "0")
+                                (html/content (key tg))
                                 [:td.client-document-item-amount]
-                                (html/content "2345"))))
+                                (html/content (str (reduce + (map (fn [grp] (* (:qty grp) (:unitPrice grp))) (val tg))))))))
   
 
 (def docWithTransform
-  (html/transform document [:#client_document] (html/prepend summaryTable)))
+  (html/transform document [:#client_document] (html/prepend fullSummary)))
 
 
 (defn -main []  
   ;(pp/pprint (html/select docWithTransform [:#summary_table])))
-  ;(println (apply str (html/emit* docWithTransform))))
+  (println (apply str (html/emit* (html/select docWithTransform [:#summary_table])))))
 
