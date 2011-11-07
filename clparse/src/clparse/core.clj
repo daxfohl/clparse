@@ -3,6 +3,7 @@
   [:require 
    [net.cgrand.enlive-html :as html]
    [clojure.pprint :as pp]
+   [clojure.string :as st]
    [clj-time [core :as tm] [format :as tmf]]])
 
 (def *base-url* "file:///C:/Users/Dax/git/clparse/clparse/invoice.html")
@@ -43,7 +44,9 @@
   (def colonSplit (.split desc ":"))
   (def task (subs (nth colonSplit 0) (+ 3 (count (nth split 0)))))
   (def works (get-works colonSplit)) 
-  works)
+  (def qty (bigdec (html/text (nth td 2))))
+  (def unitPrice (bigdec (st/replace (html/text (nth td 3)) #"[^0-9\.]" "")))
+  unitPrice)
 
 (def items
   (vec (map toItem trs)))
