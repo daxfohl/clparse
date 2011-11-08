@@ -66,19 +66,26 @@
   (* (:unitPrice workitem) (:qty workitem)))
 
 (def fullSummary
-  (html/transform summaryTable [:tr.client-document-item-rows-odd]
-                            (html/clone-for [tg (group-by :typ items)]
-                                [:p]
-                                (html/content (key tg))
-                                [:td.client-document-item-amount]
-                                (html/content (str (reduce + (map get-total (val tg))))))))
+  (html/at summaryTable 
+           [:tr.client-document-item-rows-odd]
+           (html/clone-for [tg (group-by :typ items)]
+                           [:p]                              (html/content (key tg))
+                           [:td.client-document-item-amount] (html/content (->> (val tg)
+                                                                             (map get-total)
+                                                                             (reduce +)
+                                                                             (str))))
+           [:#summary_total]
+           (html/content (->> items
+                           (map get-total)
+                           (reduce +)
+                           (str)))))
   
 
 (def docWithTransform
-  (html/transform document [:#client_document] (html/prepend fullSummary)))
+  (html/transform document [:div(html/attr= :summary "Invoice Items")] (html/before fullSummary)))
 
 
 (defn -main []  
   ;(pp/pprint (html/select docWithTransform [:#summary_table])))
-  (println (apply str (html/emit* (html/select docWithTransform [:#summary_table])))))
+  (println (apply str (html/emit* docWithTransform))))
 
