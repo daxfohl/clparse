@@ -6,85 +6,73 @@
    [clojure.string :as st]
    [clj-time [core :as tm] [format :as tmf]]])
 
-(defrecord WorkItem [date qty task typ unitPrice works])
+(defn currstr[x] (.format (java.text.NumberFormat/getCurrencyInstance) x))
+(defrecord WorkItem [date qty task task-type unit-price details])
+(defn get-total [work-item] (* (:unit-price work-item) (:qty work-item)))
+(defn get-total-string [work-items] (->> work-items (map get-total) (reduce +) (currstr)))
+(defrecord WorkItemKey [task task-type unit-price])
+(defn get-key [work-item] (WorkItemKey. (:task work-item) (:task-type work-item) (:unit-price work-item)))
 
-(def document
-  (html/html-resource (java.net.URL. "file:///C:/Users/Dax/git/clparse/clparse/invoice.html")))
-
-(def templates 
-  (html/html-resource (java.net.URL. "file:///C:/Users/Dax/git/clparse/clparse/summary_table.html")))
-
-
-(def client-document
-  (-> document
-      (html/select [:#client_document])
-      (first)))
-
-(def breakdownTable
-  (-> client-document
-      (html/select [:div(html/attr= :summary "Invoice Items")])
-      (first)))
-
-(def breakdownBody
-  (-> breakdownTable
-    (html/select [:tbody])
-    (first)))
-
-(def trs 
-  (html/select breakdownBody [:tr]))
-  
+(def document (html/html-resource (java.net.URL. "file:///C:/Users/Dax/git/clparse/clparse/invoice.html")))
+(def templates (html/html-resource (java.net.URL. "file:///C:/Users/Dax/git/clparse/clparse/templates.html")))
+(def client-document (html/select document [:#client_document]))
+(def summary-template (html/select templates [:#summary_table]))
+(def item-body-template (html/select templates [:#item_body_template]))
+(def page-break (html/select templates [:#breaks]))
+(def breakdown-table (html/select client-document [:table.client-document-items]))
+(def breakdown-body (html/select breakdown-table [:tbody.client-document-item-rows]))
+(def trs (html/select breakdown-body [:tr]))  
 (def date-formatter (tmf/formatter "MM/dd/yyyy"))
 
-(defn get-works [colonSplit]
-	(defn get-works-2 [inner]
-	  (def splits (.split inner ","))
-	  (def trims (map (fn [x] (.trim x)) splits))
-	  (vec trims))
-  (def ex (> (count colonSplit) 1))
-  (if ex (get-works-2 (nth colonSplit 1)) []))
-
-(defn toItem [tr]
+(defn to-item [tr]
   (def td (vec (html/select tr [:td])))
-  (def tp (html/text (nth td 0)))
+  (def task-type (html/text (nth td 0)))
   (def desc (html/text (nth td 1)))
-  (def split (.split desc " "))
+  (def split (st/split desc #" "))
   (def date (tmf/parse date-formatter (nth split 0)))
-  (def colonSplit (.split desc ":"))
+  (def colonSplit (st/split desc #":"))
   (def task (subs (nth colonSplit 0) (+ 3 (count (nth split 0)))))
-  (def works (get-works colonSplit)) 
+  (def details (if (> (count colonSplit) 1) (vec (map st/trim (st/split (nth colonSplit 1) #","))) [])) 
   (def qty (bigdec (html/text (nth td 2))))
-  (def unitPrice (bigdec (st/replace (html/text (nth td 3)) #"[^0-9\.]" "")))
-  (WorkItem. date qty task tp unitPrice works))
+  (def unit-price (bigdec (st/replace (html/text (nth td 3)) #"[^0-9\.]" "")))
+  (WorkItem. date qty task task-type unit-price details))
 
-(def items
-  (vec (map toItem trs)))
+(def items (vec (map to-item trs)))
 
 
-(defn get-total [workitem]
-  (* (:unitPrice workitem) (:qty workitem)))
-
-(def fullSummary
-  (html/at (html/select templates [:#summary_table]) 
+(def summary-table
+  (html/at summary-template 
            [:tr.client-document-item-rows-odd]
-           (html/clone-for [tg (group-by :typ items)]
-                           [:p]                              (html/content (key tg))
-                           [:td.client-document-item-amount] (html/content (->> (val tg)
-                                                                             (map get-total)
-                                                                             (reduce +)
-                                                                             (str))))
+           (html/clone-for [tg (group-by :task-type items)]
+                           [:p] (html/content (key tg))
+                           [:td.client-document-item-amount] (html/content (get-total-string (val tg))))
            [:#summary_total]
-           (html/content (->> items
-                           (map get-total)
-                           (reduce +)
-                           (str)))))
+           (html/content (get-total-string items))))
+
+
+(def item-groups
+  (group-by get-key items))
+
+(def item-body
+  (html/at item-body-template
+           [:tr]
+           (html/clone-for [tg (group-by get-key items)]
+                           [:td.client-document-item-type] (html/content (:task (key tg)))
+                           [:p] (html/content (->> (val tg) (map :details) (reduce concat) (distinct) (st/join "; ")))
+                           [:td.client-document-item-qty] (html/content (->> (val tg) (map :qty) (reduce +) (str)))
+                           [:td.client-document-item-unit-price] (html/content (->> (key tg) (:unit-price) (currstr)))
+                           [:td.client-document-item-amount] (html/content (get-total-string (val tg))))))
+                           
   
 
-(def docWithTransform
-  (html/transform document [:div(html/attr= :summary "Invoice Items")] (html/before 
-       [fullSummary
-        (html/select templates [:#breaks])])))
+(def doc-with-tranform
+  (html/at document 
+           [:tbody.client-document-item-rows]
+           (html/substitute item-body)
+           [:table.client-document-items] 
+           (html/before [summary-table page-break])))
 
 
 (defn -main []  
-  (println (apply str (html/emit* docWithTransform))))
+  (println (apply str (html/emit* doc-with-tranform))))
 
